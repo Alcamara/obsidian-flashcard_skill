@@ -68,6 +68,35 @@ make flashcards from my Resource/Biology folder, skip the archive
 The skill determines your **vault root** and **source dir**, scans, shows you the
 breakdown by status, authors cards per note, and writes the decks.
 
+### Slash command
+
+In harnesses that expose skills as slash commands (e.g. Claude Code), the skill
+is available as **`/obsidian-flashcards`**. The command name matches the skill
+folder. Everything after the command is passed through as arguments and mapped
+onto the script flags:
+
+```
+/obsidian-flashcards                                   # asks which folder to card
+/obsidian-flashcards Resource/Biology                  # card that folder
+/obsidian-flashcards Resource/Biology --ignore Archive/
+/obsidian-flashcards Resource --ignore "**/drafts/**" --ignore Archive/
+```
+
+| Argument | Meaning |
+|---|---|
+| *(none)* | Scan is run after you confirm the source folder. |
+| `<path>` | Source folder to card (relative to the vault root). |
+| `--ignore <pattern>` | Exclude matching notes; repeatable. Same syntax as `.fcignore`. |
+| plain words | "…ignore Archive and Templates" is understood and converted to `--ignore` flags. |
+
+Notes:
+
+- A new skill may only register on the next session start — if `/obsidian-flashcards`
+  doesn't autocomplete, restart the harness once.
+- If the source folder or vault root is ambiguous, the skill asks before scanning.
+- Updating after edits/renames is just re-running the command — see
+  [*Updating after note changes*](#updating-after-note-changes).
+
 ### Ignoring folders
 
 Three ways, which compose:
@@ -130,6 +159,25 @@ card.
   reworded card keeps its schedule. New facts omit the ID; the script assigns one.
 
 You never write `<!--SR:-->` comments yourself — the plugin owns them.
+
+### Updating after note changes
+
+To refresh a deck after editing a note, **re-run the skill on its folder**. What
+happens depends on the kind of change (all schedule-preserving except where
+noted):
+
+| You did this | What to do | Result |
+|---|---|---|
+| **Edited a note** (same name) | Re-run `/obsidian-flashcards <folder>` | Reported `changed`. Reused `fc-id`s keep schedules; new facts added; dropped facts become orphans. |
+| **Renamed only** (content identical) | Re-run | Auto-detected as `renamed`; the old deck, IDs, and schedules are adopted automatically. |
+| **Renamed *and* edited** | Re-run; the skill adopts the old deck with `--matched-old-path` | The content hash changed, so the rename can't be auto-detected — the new path shows as `new` and the old entry as `index-stale`. The skill links them, preserving schedules by `fc-id`, and (optionally) migrates the deck/tag name to match the new title. |
+| **Deleted a note** | Re-run | Old entry shows as `index-stale`; the skill reports it and can prune the orphaned deck on request. |
+
+The underlying mechanic: schedules are matched **by `fc-id`**, not by card text —
+so a fact keeps its review progress across rewordings and renames as long as its
+ID is reused. For a renamed-and-edited note, name migration is **never automatic**
+(deck names are sticky); the skill confirms whether to keep the old deck/tag name
+or rename it to follow the note.
 
 ### Orphaned cards
 
